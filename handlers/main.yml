@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Systemd daemon-reload
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Podman restart
+  become: true
+  ansible.builtin.service:
+    name: podman.socket
+    enabled: true
+    state: restarted
+
+- name: Reboot after tmpfiles update
+  become: true
+  ansible.builtin.reboot:

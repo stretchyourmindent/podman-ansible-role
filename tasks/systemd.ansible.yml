@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: MIT
+---
+# https://github.com/containers/podman/issues/13338
+- name: Check if lingering is enabled
+  become: true
+  ansible.builtin.stat:
+    path: "/var/lib/systemd/linger/{{ podman_user }}"
+  register: linger
+
+- name: Enable podman user login lingering
+  become: true
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ podman_user }}"
+  when:
+    - not linger.stat.exists
+    - systemd_config.enable_linger | default('yes')
+  register: linger
+  changed_when: true
+
+# if you need to run rootful/global podman containers and need to access
+# the global socket, then you need to adjust the permissions to allow
+# access to your podman_group members
+#
+# Note: the "!" in the line means that changing this line will only take effect
+# after a reboot, hence the call to nofify the reboot handler.
+- name: Override /run/podman group permissions
+  become: true
+  loop:
+    - regexp: "^D! /var/lib/containers/storage/tmp "
+      line: "D! /var/lib/containers/storage/tmp 0770 root {{ podman_group }}"
+    - regexp: "^D! /run/podman "
+      line: "D! /run/podman 0770 root {{ podman_group }}"
+  ansible.builtin.lineinfile:
+    dest: /etc/tmpfiles.d/podman.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  notify:
+    - Reboot after tmpfiles update
+
+- name: Create systemd socket override directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/systemd/system/podman.socket.d
+    state: directory
+    mode: "0755"
+
+- name: Override systemd socket group permissions
+  become: true
+  ansible.builtin.template:
+    src: socket_override.conf.j2
+    dest: /etc/systemd/system/podman.socket.d/socket_override.conf
+    mode: "0644"
+  notify:
+    - Systemd daemon-reload
+    - Podman restart
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure global Podman socket is started and enabled
+  become: true
+  ansible.builtin.service:
+    name: podman.socket
+    enabled: true
+    state: started
+
+- name: Ensure global Podman socket directory permissions are correct
+  become: true
+  ansible.builtin.stat:
+    path: /run/podman
+  register: podman_socket_dir
+  failed_when: not podman_socket_dir.stat.rgrp or not podman_socket_dir.stat.xgrp or podman_socket_dir.stat.gr_name != podman_group
+
+- name: Ensure global Podman socket permissions are correct
+  become: true
+  ansible.builtin.stat:
+    path: /run/podman/podman.sock
+  register: podman_socket
+  failed_when: not podman_socket.stat.rgrp or not podman_socket.stat.wgrp or podman_socket.stat.gr_name != podman_group
+
+- name: Ensure podman user Podman socket is started and enabled
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: podman.socket
+    enabled: true
+    state: started
+
+- name: Ensure podman user Podman service is started and enabled
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: podman.service
+    enabled: true
+    state: started

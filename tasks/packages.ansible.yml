@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Install Podman support packages
+  become: true
+  ansible.builtin.package:
+    state: present
+    name:
+      - podman
+      - podman-compose
+      - podman-docker
+
+- name: Remove Redhat container registries
+  become: true
+  ansible.builtin.lineinfile:
+    dest: /etc/containers/registries.conf
+    regexp: "^#?unqualified-search-registries"
+    line: "unqualified-search-registries = {{ podman_registries }}"

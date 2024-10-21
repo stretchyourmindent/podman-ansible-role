@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Update packages
+  ansible.builtin.import_tasks: packages.ansible.yml
+
+- name: Update podman-related user info
+  ansible.builtin.import_tasks: users.ansible.yml
+
+- name: Update global systemd configuration
+  ansible.builtin.import_tasks: systemd.ansible.yml

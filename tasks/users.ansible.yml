@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Ensure podman group
+  become: true
+  ansible.builtin.group:
+    name: "{{ podman_group }}"
+    state: present
+
+- name: Ensure podman user is in podman group
+  become: true
+  ansible.builtin.user:
+    name: "{{ podman_user }}"
+    append: true
+    groups: "{{ podman_group }}"
+    state: present
+  register: podman_register
+
+- name: Set ansible fact for Podman user home
+  ansible.builtin.set_fact:
+    podman_user_home: "{{ podman_register.home }}"
+
+- name: Create user systemd directory
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.file:
+    path: "{{ podman_user_home }}/.config/systemd/user"
+    state: directory
+    mode: '0750'
+
+- name: Create user systemd containers directory
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.file:
+    path: "{{ podman_user_home }}/.config/containers/systemd"
+    state: directory
+    mode: '0750'
+
+# https://github.com/containers/podman/issues/13338
+- name: Fix podman user paths in .bashrc
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ podman_user_home }}/.bashrc"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - regexp: "^#?export XDG_RUNTIME_DIR"
+      line: "export XDG_RUNTIME_DIR=\"${XDG_RUNTIME_DIR:-/run/user/$UID}\""
+    - regexp: "^#?export DBUS_SESSION_BUS_ADDRESS"
+      line: "export DBUS_SESSION_BUS_ADDRESS=\"${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}\""
+    - regexp: "^#?export PODMAN_SOCK_ROOTLESS"
+      line: "export PODMAN_SOCK_ROOTLESS=\"${PODMAN_SOCK_ROOTLESS:-${XDG_RUNTIME_DIR}/podman/podman.sock}\""
+    - regexp: "^#?export DOCKER_HOST"
+      line: "export DOCKER_HOST=\"${DOCKER_HOST:-unix://${PODMAN_SOCK_ROOTLESS}}\""
+
+- name: Get $PODMAN_SOCK_ROOTLESS from podman user
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.command: bash -ilc 'echo $PODMAN_SOCK_ROOTLESS'
+  register: podman_sock_bashrc
+  changed_when: false
+
+- name: Set ansible fact for podman_sock_rootless
+  ansible.builtin.set_fact:
+    podman_sock_rootless: "{{ podman_sock_bashrc.stdout }}"
