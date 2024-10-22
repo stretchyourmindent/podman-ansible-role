@@ -19,13 +19,21 @@
   ansible.builtin.set_fact:
     podman_user_home: "{{ podman_register.home }}"
 
+- name: Adjust user config dir permissions for group access
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.file:
+    path: "{{ podman_user_home }}/.config"
+    state: directory
+    mode: '2750'
+
 - name: Create user systemd directory
   become: true
   become_user: "{{ podman_user }}"
   ansible.builtin.file:
     path: "{{ podman_user_home }}/.config/systemd/user"
     state: directory
-    mode: '0750'
+    mode: '2750'
 
 - name: Create user systemd containers directory
   become: true
@@ -33,7 +41,7 @@
   ansible.builtin.file:
     path: "{{ podman_user_home }}/.config/containers/systemd"
     state: directory
-    mode: '0750'
+    mode: '2750'
 
 # https://github.com/containers/podman/issues/13338
 - name: Fix podman user paths in .bashrc
