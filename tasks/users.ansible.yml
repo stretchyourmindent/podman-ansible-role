@@ -49,13 +49,28 @@
 
 # https://www.redhat.com/en/blog/sudo-rootless-podman
 # https://access.redhat.com/solutions/7037240
-- name: Configure runroot to override changes due to sudo
-  become: true
-  become_user: "{{ podman_user }}"
+- name: Check if storage.conf exists
+  ansible.builtin.stat:
+    path: "{{ podman_user_home }}/.config/containers/storage.conf"
+  register: storage_conf_file
+
+- name: Copy storage.conf if required
+  when: not storage_conf_file.stat.exists
   ansible.builtin.template:
     src: storage.conf.j2
     dest: "{{ podman_user_home }}/.config/containers/storage.conf"
     mode: "0660"
+  notify:
+    - Run user podman system migrate
+    - Podman user restart
+
+- name: Update storage.conf runroot to override changes due to sudo
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ podman_user_home }}/.config/containers/storage.conf"
+    regexp: "^#?runroot = "
+    line: "runroot = \"/run/user/{{ podman_user_uid }}\""
   notify:
     - Run user podman system migrate
     - Podman user restart
