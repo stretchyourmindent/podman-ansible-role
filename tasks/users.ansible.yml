@@ -50,11 +50,15 @@
 # https://www.redhat.com/en/blog/sudo-rootless-podman
 # https://access.redhat.com/solutions/7037240
 - name: Check if storage.conf exists
+  become: true
+  become_user: "{{ podman_user }}"
   ansible.builtin.stat:
     path: "{{ podman_user_home }}/.config/containers/storage.conf"
   register: storage_conf_file
 
 - name: Copy storage.conf if required
+  become: true
+  become_user: "{{ podman_user }}"
   when: not storage_conf_file.stat.exists
   ansible.builtin.template:
     src: storage.conf.j2
