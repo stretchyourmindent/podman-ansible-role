@@ -1,5 +1,20 @@
 # SPDX-License-Identifier: MIT
 ---
+- name: Run user podman system migrate
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.command: podman system migrate
+  changed_when: true
+
+- name: Podman user restart
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: podman.socket
+    enabled: true
+    state: restarted
+
 - name: Systemd daemon-reload
   become: true
   ansible.builtin.systemd:

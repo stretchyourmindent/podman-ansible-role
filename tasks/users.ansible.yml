@@ -19,6 +19,10 @@
   ansible.builtin.set_fact:
     podman_user_home: "{{ podman_register.home }}"
 
+- name: Set ansible fact for Podman user uid
+  ansible.builtin.set_fact:
+    podman_user_uid: "{{ podman_register.uid }}"
+
 - name: Adjust user config dir permissions for group access
   become: true
   become_user: "{{ podman_user }}"
@@ -42,6 +46,20 @@
     path: "{{ podman_user_home }}/.config/containers/systemd"
     state: directory
     mode: '2750'
+
+# https://www.redhat.com/en/blog/sudo-rootless-podman
+# https://access.redhat.com/solutions/7037240
+- name: Configure runroot to override changes due to sudo
+  become: true
+  become_user: "{{ podman_user }}"
+  ansible.builtin.template:
+    src: storage.conf.j2
+    dest: "{{ podman_user_home }}/.config/containers/storage.conf"
+    mode: "0660"
+  notify:
+    - Run user podman system migrate
+    - Podman user restart
+
 
 # https://github.com/containers/podman/issues/13338
 - name: Fix podman user paths in .bashrc
