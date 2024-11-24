@@ -28,6 +28,17 @@ manage access to Podman system resources.  This group is set by the variable
     - podman-ansible-role
 ```
 
+## SSH Keys
+
+This role performs tasks that call `podman`, which, if done with a sudo user,
+can cause Podman system misconfiguration for rootless containers running as
+that user.  It is recommended to only perform tasks that call `podman` directly
+as the user who will run the rootless container by using the `remote_user`
+keyword.  This requires a new SSH connection as the given user, but will attempt
+to use the default private key of the current Ansible invocation.  Therefore,
+it is important to ensure that the ansible user's public key is also in the
+`authorized_keys` file for the Podman user that will run the container.
+
 ## License
 
 MIT

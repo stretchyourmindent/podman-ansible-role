@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: MIT
 ---
 - name: Run user podman system migrate
-  become: true
-  become_user: "{{ podman_user }}"
+  remote_user: "{{ podman_user }}"
   ansible.builtin.command: podman system migrate
   changed_when: true
 
